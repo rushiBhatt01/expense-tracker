@@ -24,11 +24,14 @@ const runInTransaction = async (callback: (session?: mongoose.ClientSession) => 
       }
       session.endSession();
     }
-    // Fallback if standalone MongoDB doesn't support transactions
-    const isTxUnsupported = error.message?.includes('Replica Set') || 
-                            error.message?.includes('transaction') || 
+    // Fallback if standalone or certain cloud MongoDB clusters don't support transactions
+    const errText = `${error.message || ''} ${error.originalError?.message || ''} ${error.codeName || ''}`.toLowerCase();
+    const isTxUnsupported = errText.includes('replica') || 
+                            errText.includes('transaction') || 
+                            errText.includes('retry') ||
                             error.code === 20 || 
-                            error.codeName === 'CommandNotSupported';
+                            error.codeName === 'CommandNotSupported' ||
+                            error.codeName === 'IllegalOperation';
     if (isTxUnsupported) {
       console.warn('MongoDB transactions not supported by deployment. Executing query fallback...');
       return await callback();
